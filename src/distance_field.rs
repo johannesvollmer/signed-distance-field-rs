@@ -47,7 +47,7 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
             distance_targets: vec![(0, 0); width as usize * height as usize],
         };
 
-        // at every pixel directly next to an edge, set its distance to zero
+        // for every pixel directly at an edge, set its distance to zero
         for y in 0..height {
             for x in 0..width {
                 if     is_at_edge(binary_image, x, y, -1,  0)
@@ -55,7 +55,7 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
                     || is_at_edge(binary_image, x, y,  0, -1)
                     || is_at_edge(binary_image, x, y,  0,  1)
                 {
-                    distance_field.set_distance_target(x, y, x, y);
+                    distance_field.set_target_and_distance(x, y, x, y, 0.0);
                 }
             }
         }
@@ -63,20 +63,46 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         // perform forwards iteration
         for y in 0..height {
             for x in 0..width {
-                distance_field.update_distance_based_on_neighbour(x, y, -1, -1);
-                distance_field.update_distance_based_on_neighbour(x, y,  0, -1);
-                distance_field.update_distance_based_on_neighbour(x, y,  1, -1);
-                distance_field.update_distance_based_on_neighbour(x, y, -1,  0);
+                let mut distance = distance_field.get_distance(x, y);
+                let (mut target_x, mut target_y) = distance_field.get_distance_target(x, y);
+
+                distance_field.update_distance(x, y, -1, -1, &mut distance, &mut target_x, &mut target_y);
+                distance_field.update_distance(x, y,  0, -1, &mut distance, &mut target_x, &mut target_y);
+                distance_field.update_distance(x, y,  1, -1, &mut distance, &mut target_x, &mut target_y);
+                distance_field.update_distance(x, y, -1,  0, &mut distance, &mut target_x, &mut target_y);
+
+                distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
             }
         }
 
-        // perform backwards iteration
+        // perform backwards iteration.
+        // Similar to first iteration, but only writes conditionally,
+        // as not all pixels will be updated in this iteration
+        // which will save us some f16 conversion and heap writes
         for y in (0..height).rev() {
             for x in (0..width).rev() {
-                distance_field.update_distance_based_on_neighbour(x, y,  1,  0);
-                distance_field.update_distance_based_on_neighbour(x, y, -1,  1);
-                distance_field.update_distance_based_on_neighbour(x, y,  0,  1);
-                distance_field.update_distance_based_on_neighbour(x, y,  1,  1);
+                let mut distance = distance_field.get_distance(x, y);
+                let (mut target_x, mut target_y) = distance_field.get_distance_target(x, y);
+
+                let right = distance_field.update_distance(
+                    x, y,  1,  0, &mut distance, &mut target_x, &mut target_y
+                );
+
+                let top_left = distance_field.update_distance(
+                    x, y, -1,  1, &mut distance, &mut target_x, &mut target_y
+                );
+
+                let top = distance_field.update_distance(
+                    x, y,  0,  1, &mut distance, &mut target_x, &mut target_y
+                );
+
+                let top_right = distance_field.update_distance(
+                    x, y,  1,  1, &mut distance, &mut target_x, &mut target_y
+                );
+
+                if right || top_left || top || top_right {
+                    distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
+                }
             }
         }
 
@@ -94,7 +120,10 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     }
 
     #[inline(always)]
-    fn update_distance_based_on_neighbour(&mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32) {
+    fn update_distance(
+        &mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32,
+        own_distance: &mut f32, own_target_x: &mut u16, own_target_y: &mut u16
+    ) -> bool {
         // this should be const per function call, as `neighbour` is const per function call
         let distance_to_neighbour = length(neighbour_x, neighbour_y);
 
@@ -107,16 +136,19 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
             let neighbour_y = neighbour_y as u16;
             let neighbour_distance = self.get_distance(neighbour_x, neighbour_y);
 
-            // subsequent calls should use only one single lookup, after inlining
-            let own_distance = self.get_distance(x, y);
-
             // if neighbour is closer to edge than ourselves,
             // set our distance to the neighbours distance plus the space between us
-            if neighbour_distance + distance_to_neighbour < own_distance {
+            if neighbour_distance + distance_to_neighbour < *own_distance {
                 let neighbour_target = self.get_distance_target(neighbour_x, neighbour_y);
-                self.set_distance_target(x, y, neighbour_target.0, neighbour_target.1);
+
+                *own_distance = distance(x, y, neighbour_target.0, neighbour_target.1);
+                *own_target_x = neighbour_target.0;
+                *own_target_y = neighbour_target.1;
+                return true
             }
         }
+
+        false
     }
 
     #[inline(always)]
@@ -130,9 +162,9 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     }
 
     #[inline(always)]
-    fn set_distance_target(&mut self, x: u16, y: u16, target_x: u16, target_y: u16) {
+    fn set_target_and_distance(&mut self, x: u16, y: u16, target_x: u16, target_y: u16, distance: f32) {
         let index = self.flatten_index(x, y);
-        self.distances.set(index, distance(x, y, target_x, target_y));
+        self.distances.set(index, distance);
         self.distance_targets[index] = (target_x, target_y);
     }
 

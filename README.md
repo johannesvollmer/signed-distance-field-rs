@@ -12,8 +12,8 @@ The complexity of the algorithm
 is linear, while an exact algorithm
 would have quadratic complexity.
 
-On my machine, the distance field on an image with
-4096 * 4096 (16 Megapixels) pixels can be computed in about 3 seconds.
+On my machine, the distance field of an image with
+4096 * 4096 (16 Megapixels) pixels can be computed in about 1.14 seconds.
 
 
 

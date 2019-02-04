@@ -67,10 +67,10 @@ mod tests {
             .collect();
 
         let binary_image = BinaryByteImage::from_slice(width as u16, height as u16, &binary_image_buffer);
-        let distance_field = SignedDistanceField::<F16DistanceStorage>::compute_approximate(&binary_image);
+        let distance_field = SignedDistanceField::<F32DistanceStorage>::compute_approximate(&binary_image);
 
         let different_pixels: f32 = distance_field.distances.iter()
-            .map(|distance| if distance.to_f32() < 0.0 { 255_u8 } else { 0_u8 })
+            .map(|distance| if *distance < 0.0 { 255_u8 } else { 0_u8 })
             .zip(binary_image_buffer.iter())
             .map(|(a, &b)| a as i32 - b as i32)
             .map(|difference| (difference as f32).abs())
@@ -83,12 +83,11 @@ mod tests {
 
     #[test]
     pub fn reconstruct_circle(){
-        // 5.405 s
-        reconstruct_distance_function(2048*4, 2048*2, circle_sdf(128, 128, 64));
+        reconstruct_distance_function(2048*2, 2048*2, circle_sdf(128, 128, 64));
     }
 
-    /*#[test]
+    #[test]
     pub fn reconstruct_rectangle(){
         reconstruct_distance_function(2048*4, 2048*4, rectangle_sdf(179, 179, 37, 37));
-    }*/
+    }
 }
