@@ -1,7 +1,4 @@
-
 use crate::binary_image::BinaryImage;
-use std::ops::IndexMut;
-
 
 
 #[derive(Clone, PartialEq, Debug)]
@@ -21,12 +18,13 @@ pub type F16DistanceStorage = Vec<half::f16>;
 pub type F32DistanceStorage = Vec<f32>;
 
 pub trait DistanceStorage {
+    /// All distances in this field must be initialized to `INFINITY`.
     fn new(length: usize) -> Self;
 
-    #[inline]
+    #[inline(always)]
     fn get(&self, index: usize) -> f32;
 
-    #[inline]
+    #[inline(always)]
     fn set(&mut self, index: usize, distance: f32);
 }
 
@@ -37,7 +35,7 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     /// Approximates the signed distance field of the specified image.
     /// The algorithm used is based on the paper `The "dead reckoning" signed distance transform`
     /// by George J. Grevara, 2004.
-    pub fn compute_approximate(binary_image: &impl BinaryImage) -> Self {
+    pub fn compute(binary_image: &impl BinaryImage) -> Self {
         let width = binary_image.width();
         let height = binary_image.height();
 
@@ -71,6 +69,8 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
                 distance_field.update_distance(x, y,  1, -1, &mut distance, &mut target_x, &mut target_y);
                 distance_field.update_distance(x, y, -1,  0, &mut distance, &mut target_x, &mut target_y);
 
+                // write unconditionally to avoid branching,
+                // as almost all values will be written in the first pass
                 distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
             }
         }
@@ -100,6 +100,8 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
                     x, y,  1,  1, &mut distance, &mut target_x, &mut target_y
                 );
 
+                // only write if something changed, as the second pass may touch few pixels
+                // (profiled with an image of a circle)
                 if right || top_left || top || top_right {
                     distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
                 }
@@ -119,11 +121,13 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         distance_field
     }
 
+    /// Returns true, if the mutable values have been changed should be updated
     #[inline(always)]
     fn update_distance(
         &mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32,
         own_distance: &mut f32, own_target_x: &mut u16, own_target_y: &mut u16
-    ) -> bool {
+    ) -> bool
+    {
         // this should be const per function call, as `neighbour` is const per function call
         let distance_to_neighbour = length(neighbour_x, neighbour_y);
 
@@ -152,12 +156,12 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     }
 
     #[inline(always)]
-    pub fn get_distance(&mut self, x: u16, y: u16) -> f32 {
+    pub fn get_distance(&self, x: u16, y: u16) -> f32 {
         self.distances.get(self.flatten_index(x, y))
     }
 
     #[inline(always)]
-    pub fn get_distance_target(&mut self, x: u16, y: u16) -> (u16, u16) {
+    pub fn get_distance_target(&self, x: u16, y: u16) -> (u16, u16) {
         self.distance_targets[self.flatten_index(x, y)]
     }
 
@@ -214,12 +218,12 @@ impl DistanceStorage for F16DistanceStorage {
         vec![half::consts::INFINITY; length]
     }
 
-    #[inline]
+    #[inline(always)]
     fn get(&self, index: usize) -> f32 {
         self[index].to_f32()
     }
 
-    #[inline]
+    #[inline(always)]
     fn set(&mut self, index: usize, distance: f32) {
         self[index] = half::f16::from_f32(distance)
     }
@@ -230,12 +234,12 @@ impl DistanceStorage for F32DistanceStorage {
         vec![std::f32::INFINITY; length]
     }
 
-    #[inline]
+    #[inline(always)]
     fn get(&self, index: usize) -> f32 {
         self[index]
     }
 
-    #[inline]
+    #[inline(always)]
     fn set(&mut self, index: usize, distance: f32) {
         self[index] = distance
     }
