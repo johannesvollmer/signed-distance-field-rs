@@ -18,10 +18,8 @@ pub mod prelude {
         F16DistanceStorage, F32DistanceStorage
     };
 
-    #[cfg(piston_image)]
-    pub use crate::binary_image::piston_image::{
-        from_gray_u8_image, from_gray_u8_image_with_threshold
-    };
+    #[cfg(feature = "piston_image")]
+    pub use crate::binary_image::piston_image as binary_piston_image;
 }
 
 
@@ -210,5 +208,4 @@ mod tests {
 
         assert!(error_per_pixel < tolerance, "too many incorrect pixels");
     }
-
 }

@@ -28,6 +28,14 @@ pub trait DistanceStorage {
     fn set(&mut self, index: usize, distance: f32);
 }
 
+pub struct NormalizedDistanceField<D: DistanceStorage> {
+    pub width: u16,
+    pub height: u16,
+    pub distances: D,
+    pub zero_distance: f32, // edges, formerly 0
+    pub former_min_distance: f32,
+    pub former_max_distance: f32
+}
 
 
 impl<D> SignedDistanceField<D> where D: DistanceStorage {
@@ -183,6 +191,11 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     pub fn flatten_index(&self, x: u16, y: u16) -> usize {
         self.width as usize * y as usize + x as usize
     }
+
+    /// Scales all distances such that the smallest distance is zero and the largest is one.
+    pub fn normalize_distances(self) -> NormalizedDistanceField<D> {
+        NormalizedDistanceField::from_distance_field(self)
+    }
 }
 
 #[inline(always)]
@@ -212,6 +225,47 @@ fn check_coordinates(x: i32, y: i32, width: u16, height: u16) -> bool {
     x >= 0 && y >= 0 && x < width as i32 && y < height as i32
 }
 
+
+impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
+    pub fn from_distance_field(distance_field: SignedDistanceField<D>) -> Self {
+        let mut distance_field = distance_field;
+        let width = distance_field.width;
+        let height = distance_field.height;
+
+        let (min, max) = (0..width as usize * height as usize)
+            .map(|index| distance_field.distances.get(index))
+            .fold(
+                (std::f32::INFINITY, std::f32::NEG_INFINITY),
+                |(min, max), distance| (
+                    min.min(distance),
+                    max.max(distance)
+                )
+            );
+
+        for index in 0..width as usize * height as usize {
+            let distance = distance_field.distances.get(index);
+            let normalized = (distance - min) / (max - min);
+            distance_field.distances.set(index, normalized);
+        }
+
+        NormalizedDistanceField {
+            width, height,
+            distances: distance_field.distances,
+            zero_distance: (0.0 - min) / (max - min),
+            former_max_distance: max, former_min_distance: min
+        }
+    }
+
+    #[cfg(feature = "piston_image")]
+    pub fn to_gray_u8_image(&self) -> image::GrayImage {
+        let vec = (0..self.width as usize * self.height as usize)
+            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * 255.0) as u8)
+            .collect();
+
+        image::GrayImage::from_raw(self.width as u32, self.height as u32, vec)
+            .expect("incorrect vector length")
+    }
+}
 
 impl DistanceStorage for F16DistanceStorage {
     fn new(length: usize) -> Self {

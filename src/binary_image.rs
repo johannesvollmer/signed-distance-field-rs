@@ -47,35 +47,37 @@ impl BinaryImage for BinaryByteImage<'_> {
     }
 }
 
-#[cfg(piston_image)]
+#[cfg(feature = "piston_image")]
 pub mod piston_image {
     use image::*;
     use super::BinaryImage;
 
 
-    pub fn from_gray_u8_image(image: &GrayImage) -> WithThreshold<u8, Vec<u8>> {
-        from_gray_u8_image_with_threshold(image, 127)
+    pub fn of_gray_u8_image(image: &GrayImage) -> WithThreshold<u8, Vec<u8>> {
+        of_gray_u8_image_with_threshold(image, 127)
     }
 
-    pub fn from_gray_u8_image_with_threshold(image: &GrayImage, threshold: u8)
+    pub fn of_gray_u8_image_with_threshold(image: &GrayImage, threshold: u8)
         -> WithThreshold<u8, Vec<u8>>
     {
         WithThreshold::of(image, threshold)
     }
 
 
-    pub struct WithThreshold<'i, P: Primitive, C: Container> {
-        image: &'i ImageBuffer<Luma<P>, C>,
+    pub struct WithThreshold<'i, P: 'static + Primitive, Container> {
+        image: &'i ImageBuffer<Luma<P>, Container>,
         threshold: P,
     }
 
-    impl<'i, P, C> WithThreshold<'i, P, C> where P: Primitive, C: Container {
+    impl<'i, P, C> WithThreshold<'i, P, C> where P: 'static + Primitive {
         pub fn of(image: &'i ImageBuffer<Luma<P>, C>, threshold: P) -> Self {
             WithThreshold { image, threshold }
         }
     }
 
-    impl<'i, P, C> BinaryImage for WithThreshold<'i, P, C> where P: Primitive, C: Container {
+    impl<'i, P, C> BinaryImage for WithThreshold<'i, P, C>
+        where P: 'static + Primitive, C: std::ops::Deref<Target = [P]>
+    {
         fn width(&self) -> u16 {
             self.image.width() as u16
         }
