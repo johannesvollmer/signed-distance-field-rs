@@ -5,3 +5,8 @@ authors = ["johannesvollmer <johannes.boenki@t-online.de>"]
 edition = "2018"
 
 [dependencies]
+# TODO let users of this library specify if they want to use intrinsics?
+half = "1.3.0" # { version = "1.3.0", features = [ "use-intrinsics" ] }
+
+[dev-dependencies]
+image = "0.21.0"
