@@ -15,6 +15,15 @@ would have quadratic complexity.
 On my machine, the distance field of an image with
 4096 * 4096 (16 Megapixels) pixels can be computed in about 1.14 seconds.
 
+## Features
+In the process of computing the signed distance field, 
+the algorithm constructs an image with each pixel 
+containing the vectors which point to the nearest edge. 
+This vector distance field is made available
+after computing the plain distance field and can be used 
+for further processing.
+
+
 ## Getting Started
 
 ```rust
@@ -39,5 +48,5 @@ by enabling the feature flag `piston_image`.
 ## TODO
 - [x] Enable customized memory destination 
       instead of predefined allocations
-- [ ] Profiling and Benchmarking
+- [ ] Real Profiling and Benchmarking
 - [ ] Consider SIMD and Multithread optimization?
