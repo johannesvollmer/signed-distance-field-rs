@@ -1,4 +1,4 @@
-# SDF-DEAD-RECKONING
+# SIGNED-DISTANCE-FIELD-RS
 
 Fast Signed Distance Fields for Rust!
 

@@ -1,5 +1,5 @@
 [package]
-name = "sdf-dead-reckoning"
+name = "signed-distance-field"
 version = "0.6.0"
 authors = ["johannesvollmer"]
 edition = "2018"
