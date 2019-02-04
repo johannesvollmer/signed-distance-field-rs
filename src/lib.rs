@@ -65,11 +65,11 @@ mod tests {
 
     #[test]
     pub fn reconstruct_circle(){
-        reconstruct_distance_function(512, 512, circle_sdf(128, 128, 64));
+        reconstruct_distance_function(2048*2, 2048*2, circle_sdf(128, 128, 64));
     }
 
-    #[test]
+    /*#[test]
     pub fn reconstruct_rectangle(){
-        reconstruct_distance_function(512, 512, rectangle_sdf(179, 179, 37, 37));
-    }
+        reconstruct_distance_function(2048*4, 2048*4, rectangle_sdf(179, 179, 37, 37));
+    }*/
 }
