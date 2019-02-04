@@ -1,7 +1,7 @@
 [package]
 name = "sdf-dead-reckoning"
-version = "0.1.0"
-authors = ["johannesvollmer <johannes.boenki@t-online.de>"]
+version = "0.6.0"
+authors = ["johannesvollmer"]
 edition = "2018"
 
 description = "Fast signed distance fields algorithm using `dead reckoning`"
