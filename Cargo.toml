@@ -33,3 +33,11 @@ half = "1.3.0" # { version = "1.3.0", features = [ "use-intrinsics" ] }
 name = "convert_sketch"
 required-features = ["piston_image" ]
 
+
+[dev-dependencies]
+criterion = "0.2.9"
+
+[[bench]]
+path = "benches/buffered.rs"
+name = "buffered"
+harness = false
