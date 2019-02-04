@@ -1,6 +1,11 @@
+//! This crate approximates a signed
+//! distance field, given a binary image.
+//! The algorithm used is called "dead reckoning",
+//! as described in `The "dead reckoning" signed distance transform`
+//! by George J. Grevara (2004).
+
 pub mod binary_image;
 pub mod distance_field;
-
 
 pub mod prelude {
     pub use crate::{
@@ -25,14 +30,17 @@ pub mod prelude {
 
 use prelude::*;
 
+/// Compute the signed distance field with the specified distance storage of the specified binary image.
 pub fn compute_distance_field<D: DistanceStorage>(image: &impl BinaryImage) -> SignedDistanceField<D> {
     SignedDistanceField::compute(image)
 }
 
+/// Compute the signed distance field with an `f16` distance storage of the specified binary image.
 pub fn compute_f16_distance_field(image: &impl BinaryImage) -> SignedDistanceField<F16DistanceStorage> {
     compute_distance_field(image)
 }
 
+/// Compute the signed distance field with an `f32` distance storage of the specified binary image.
 pub fn compute_f32_distance_field(image: &impl BinaryImage) -> SignedDistanceField<F32DistanceStorage> {
     compute_distance_field(image)
 }
@@ -154,7 +162,14 @@ mod tests {
     #[test]
     pub fn reconstruct_circle_distance_field(){
         reconstruct_distance_field::<F16DistanceStorage, _>(
-            2048, 2048, 2.0, circle_distance(128, 128, 64)
+            2048, 2048, 2.0, circle_distance(128, 128, 128)
+        );
+    }
+
+    #[test]
+    pub fn reconstruct_dot_distance_field(){
+        reconstruct_distance_field::<F16DistanceStorage, _>(
+            2048, 2048, 2.0, circle_distance(128, 128, 4)
         );
     }
 
@@ -200,8 +215,6 @@ mod tests {
                 summed_error += (ground_truth - reconstructed).abs();
             }
         }
-
-        println!("{}", summed_error);
 
         let error_per_pixel = summed_error / (width as f32 * height as f32);
         println!("average error per pixel: {}", error_per_pixel);

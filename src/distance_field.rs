@@ -1,24 +1,43 @@
 use crate::binary_image::BinaryImage;
 
 
+/// Contains the distance field and the vector field produced by `SignedDistanceField::compute`.
+/// Can be normalized in order to convert to an image with limited range.
+/// The type parameter `D` can be used to customize the memory layout of the distance field.
+/// The default storages are `Vec<f23>` and `Vec<f16>`.
 #[derive(Clone, PartialEq, Debug)]
 pub struct SignedDistanceField<D: DistanceStorage> {
     pub width: u16,
     pub height: u16,
+
+    /// A row-major image vector with
+    /// for each pixel of the original image
+    /// containing the distance from that pixel to the nearest edge
     pub distances: D,
+
+    /// A row-major image vector with
+    /// for each pixel of the original image
+    /// containing the absolute position of the nearest edge from that pixel
     pub distance_targets: Vec<(u16, u16)>
 }
 
-/// Needs less storage with sufficient precision, but takes about
-/// twice as long because of conversions between f16 and f32.
+/// Store distances as a vector of `f16` numbers.
+/// Needs less storage with sufficient precision,
+/// but significantly longer to compute
+/// because of conversions between f16 and f32.
 pub type F16DistanceStorage = Vec<half::f16>;
 
-/// Needs more storage with high precision, but takes about
-/// half as long because no conversions between f16 and f32 must be made.
+/// Store distances as a vector of `f32` numbers.
+/// Needs more storage while providing high precision, but is significantly quicker
+/// because no conversions between f16 and f32 must be made.
 pub type F32DistanceStorage = Vec<f32>;
 
+/// Specifies how to store distances in memory.
+/// This library defines an `f16` storage and an `f32` storage.
 pub trait DistanceStorage {
-    /// All distances in this field must be initialized to `INFINITY`.
+
+    /// Construct a new linear storage with the specified length.
+    /// __All distances in this array must be initialized to `INFINITY`.__
     fn new(length: usize) -> Self;
 
     #[inline(always)]
@@ -28,12 +47,29 @@ pub trait DistanceStorage {
     fn set(&mut self, index: usize, distance: f32);
 }
 
+/// Represents a distance field which was normalized to the range `[0, 1]`.
+/// Also contains information about the greatest distances of the unnormalized distance field.
 pub struct NormalizedDistanceField<D: DistanceStorage> {
     pub width: u16,
     pub height: u16,
+
+    /// All distances are in the range of `[0..1]`.
     pub distances: D,
-    pub zero_distance: f32, // edges, formerly 0
+
+    /// In the original distance field, edges are represented by a distance of zero.
+    /// Normalizing the distance field will result in edges no longer being zero.
+    /// The normalized field will have edges somewhere between zero and one.
+    /// This float describes the new value that edges in the normalized field have.
+    pub zero_distance: f32,
+
+    /// The largest distance in the image
+    /// to the nearest edge
+    /// __outside__ of a shape .
     pub former_min_distance: f32,
+
+    /// The largest distance in the image
+    /// to the nearest edge
+    /// __inside__ of a shape
     pub former_max_distance: f32
 }
 
@@ -143,7 +179,7 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         let neighbour_y = y as i32 + neighbour_y;
 
         // if neighbour exists, update ourselves according to the neighbour
-        if check_coordinates(neighbour_x, neighbour_y, self.width, self.height) {
+        if is_valid_index(neighbour_x, neighbour_y, self.width, self.height) {
             let neighbour_x = neighbour_x as u16;
             let neighbour_y = neighbour_y as u16;
             let neighbour_distance = self.get_distance(neighbour_x, neighbour_y);
@@ -163,16 +199,29 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         false
     }
 
+    /// Returns the distance of the specified pixel to the nearest edge in the original image.
     #[inline(always)]
     pub fn get_distance(&self, x: u16, y: u16) -> f32 {
+        debug_assert!(
+            is_valid_index(x as i32, y as i32, self.width, self.height),
+            "Invalid pixel distance index"
+        );
+
         self.distances.get(self.flatten_index(x, y))
     }
 
+    /// Returns the absolute index of the nearest edge to the specified pixel in the original image.
     #[inline(always)]
     pub fn get_distance_target(&self, x: u16, y: u16) -> (u16, u16) {
+        debug_assert!(
+            is_valid_index(x as i32, y as i32, self.width, self.height),
+            "Invalid pixel distance target index"
+        );
+
         self.distance_targets[self.flatten_index(x, y)]
     }
 
+    /// Update the distance and target field at the specified pixel index
     #[inline(always)]
     fn set_target_and_distance(&mut self, x: u16, y: u16, target_x: u16, target_y: u16, distance: f32) {
         let index = self.flatten_index(x, y);
@@ -186,47 +235,58 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         self.distances.set(index, - self.distances.get(index));
     }
 
-
+    /// Convert x and y pixel coordinates to the corresponding
+    /// one-dimensional index in a row-major image vector.
     #[inline]
     pub fn flatten_index(&self, x: u16, y: u16) -> usize {
         self.width as usize * y as usize + x as usize
     }
 
     /// Scales all distances such that the smallest distance is zero and the largest is one.
+    /// Also computes the former minimum and maximum distance, as well as the new edge-value.
     pub fn normalize_distances(self) -> NormalizedDistanceField<D> {
         NormalizedDistanceField::from_distance_field(self)
     }
 }
 
+/// Returns if the binary image contains an edge
+/// at the specified pixel compared to the specified neighbour.
 #[inline(always)]
 fn is_at_edge(image: &impl BinaryImage, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32) -> bool {
     let neighbour_x = x as i32 + neighbour_x;
     let neighbour_y = y as i32 + neighbour_y;
 
-    check_coordinates(neighbour_x, neighbour_y, image.width(), image.height())
+    is_valid_index(neighbour_x, neighbour_y, image.width(), image.height())
 
         // consecutive `image.is_inside(x, y)` should be optimized to a single call in a loop
         && image.is_inside(x, y) != image.is_inside(neighbour_x as u16, neighbour_y as u16)
 }
 
+/// The length of a vector with x and y coordinates.
 #[inline]
 fn length(x: i32, y: i32) -> f32 {
     let sqr_distance = x * x + y * y;
     (sqr_distance as f32).sqrt()
 }
 
+/// The distance between to points with x and y coordinates.
 #[inline]
 fn distance(x: u16, y: u16, target_x: u16, target_y: u16) -> f32 {
     length(x as i32 - target_x as i32, y as i32 - target_y as i32)
 }
 
+/// Check if x and y are valid pixel coordinates
+/// inside an image with the specified width and height.
 #[inline]
-fn check_coordinates(x: i32, y: i32, width: u16, height: u16) -> bool {
+fn is_valid_index(x: i32, y: i32, width: u16, height: u16) -> bool {
     x >= 0 && y >= 0 && x < width as i32 && y < height as i32
 }
 
 
 impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
+
+    /// Scales all distances such that the smallest distance is zero and the largest is one.
+    /// Also computes the former minimum and maximum distance, as well as the new edge-value.
     pub fn from_distance_field(distance_field: SignedDistanceField<D>) -> Self {
         let mut distance_field = distance_field;
         let width = distance_field.width;
@@ -256,6 +316,7 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
         }
     }
 
+    /// Convert the normalized distance to an `u8` image with the range fully utilized.
     #[cfg(feature = "piston_image")]
     pub fn to_gray_u8_image(&self) -> image::GrayImage {
         let vec = (0..self.width as usize * self.height as usize)
