@@ -37,7 +37,7 @@ use sdf-dead-reckoning with the piston image crate feature,
 by enabling the feature flag `piston_image`.
 
 ## TODO
-- [ ] Enable customized memory destination 
+- [x] Enable customized memory destination 
       instead of predefined allocations
 - [ ] Profiling and Benchmarking
 - [ ] Consider SIMD and Multithread optimization?
