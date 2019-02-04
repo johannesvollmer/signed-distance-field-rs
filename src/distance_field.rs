@@ -202,22 +202,12 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     /// Returns the distance of the specified pixel to the nearest edge in the original image.
     #[inline(always)]
     pub fn get_distance(&self, x: u16, y: u16) -> f32 {
-        debug_assert!(
-            is_valid_index(x as i32, y as i32, self.width, self.height),
-            "Invalid pixel distance index"
-        );
-
         self.distances.get(self.flatten_index(x, y))
     }
 
     /// Returns the absolute index of the nearest edge to the specified pixel in the original image.
     #[inline(always)]
     pub fn get_distance_target(&self, x: u16, y: u16) -> (u16, u16) {
-        debug_assert!(
-            is_valid_index(x as i32, y as i32, self.width, self.height),
-            "Invalid pixel distance target index"
-        );
-
         self.distance_targets[self.flatten_index(x, y)]
     }
 
@@ -239,6 +229,11 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     /// one-dimensional index in a row-major image vector.
     #[inline]
     pub fn flatten_index(&self, x: u16, y: u16) -> usize {
+        debug_assert!(
+            is_valid_index(x as i32, y as i32, self.width, self.height),
+            "Invalid pixel target index"
+        );
+
         self.width as usize * y as usize + x as usize
     }
 
