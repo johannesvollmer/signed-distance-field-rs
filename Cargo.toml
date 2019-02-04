@@ -7,7 +7,7 @@ description = "Fast signed distance fields algorithm using `dead reckoning`"
 # TODO documentation = "..."
 readme = "README.md"
 repository = "https://github.com/johannesvollmer/sdf-dead-reckoning"
-keywords = ["distance field", "signed distance field", "dead reckoning", "vector field", "SDF"]
+keywords = ["signed", "distance", "vector", "field", "sdf"]
 categories = ["algorithms", "graphics", "gui", "multimedia::images", "encoding"]
 license = "MIT"
 
