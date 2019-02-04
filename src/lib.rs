@@ -6,6 +6,24 @@ pub mod prelude {
     pub use crate::binary_image::BinaryImage;
     pub use crate::binary_image::BinaryByteImage;
     pub use crate::distance_field::SignedDistanceField;
+    pub use crate::distance_field::DistanceStorage;
+    pub use crate::distance_field::F16DistanceStorage;
+    pub use crate::distance_field::F32DistanceStorage;
+}
+
+use prelude::*;
+
+
+pub fn compute<D: DistanceStorage>(image: &impl BinaryImage) -> SignedDistanceField<D> {
+    SignedDistanceField::compute_approximate(image)
+}
+
+pub fn compute_f16(image: &impl BinaryImage) -> SignedDistanceField<F16DistanceStorage> {
+    compute(image)
+}
+
+pub fn compute_f32(image: &impl BinaryImage) -> SignedDistanceField<F32DistanceStorage> {
+    compute(image)
 }
 
 
@@ -49,7 +67,7 @@ mod tests {
             .collect();
 
         let binary_image = BinaryByteImage::from_slice(width as u16, height as u16, &binary_image_buffer);
-        let distance_field = SignedDistanceField::compute_approximate(&binary_image);
+        let distance_field = SignedDistanceField::<F16DistanceStorage>::compute_approximate(&binary_image);
 
         let different_pixels: f32 = distance_field.distances.iter()
             .map(|distance| if distance.to_f32() < 0.0 { 255_u8 } else { 0_u8 })
@@ -65,7 +83,8 @@ mod tests {
 
     #[test]
     pub fn reconstruct_circle(){
-        reconstruct_distance_function(2048*2, 2048*2, circle_sdf(128, 128, 64));
+        // 5.405 s
+        reconstruct_distance_function(2048*4, 2048*2, circle_sdf(128, 128, 64));
     }
 
     /*#[test]
