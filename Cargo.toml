@@ -3,14 +3,18 @@ name = "sdf-dead-reckoning"
 version = "0.6.0"
 authors = ["johannesvollmer"]
 edition = "2018"
-
 description = "Fast signed distance fields algorithm using `dead reckoning`"
-
 # TODO documentation = "..."
 readme = "README.md"
 repository = "https://github.com/johannesvollmer/sdf-dead-reckoning"
 keywords = ["distance field", "signed distance field", "dead reckoning", "vector field", "SDF"]
 categories = ["algorithms", "graphics", "gui", "multimedia::images", "encoding"]
+license = "MIT"
+
+exclude = [
+    "images",
+    "images/*",
+]
 
 [features]
 piston_image = [ "image" ]
