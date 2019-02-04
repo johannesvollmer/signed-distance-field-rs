@@ -23,8 +23,18 @@ This vector distance field is made available
 after computing the plain distance field and can be used 
 for further processing.
 
+## Piston Images
+This library can be configured to offer some 
+simple conversions to and from piston images.
+The feature flag `piston_image` unlocks these functions.
+The image crate is not required to calculate the
+signed distance field. 
+
 
 ## Getting Started
+
+<!-- TODO: dependency with piston image feature-->
+
 
 ```rust
 use sdf_dead_reckoning::prelude::*;
