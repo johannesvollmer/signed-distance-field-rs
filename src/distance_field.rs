@@ -310,13 +310,23 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
     }
 
     /// Convert the normalized distance to an `u8` image with the range fully utilized.
+    pub fn to_u8(&self) -> Vec<u8> {
+        (0..self.width as usize * self.height as usize)
+            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u8::MAX) as u8)
+            .collect()
+    }
+
+    /// Convert the normalized distance to an `u16` image with the range fully utilized.
+    pub fn to_u16(&self) -> Vec<u16> {
+        (0..self.width as usize * self.height as usize)
+            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u16::MAX) as u16)
+            .collect()
+    }
+
+    /// Convert the normalized distance to an `u8` gray piston image with the range fully utilized.
     #[cfg(feature = "piston_image")]
     pub fn to_gray_u8_image(&self) -> image::GrayImage {
-        let vec = (0..self.width as usize * self.height as usize)
-            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * 255.0) as u8)
-            .collect();
-
-        image::GrayImage::from_raw(self.width as u32, self.height as u32, vec)
+        image::GrayImage::from_raw(self.width as u32, self.height as u32, self.to_u8())
             .expect("incorrect vector length")
     }
 }
