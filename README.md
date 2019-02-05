@@ -29,6 +29,9 @@ Update your `Cargo.toml`:
 signed-distance-field = "0.6.2"
 ```
 
+Use `compute_f32_distance_field` to compute 
+a distance field with `f32` precision and memory usage.
+
 ```rust
 use signed_distance_field::prelude::*;
     
