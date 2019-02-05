@@ -1,3 +1,6 @@
+[![Crate](https://img.shields.io/crates/v/signed-distance-field.svg)](https://crates.io/crates/signed-distance-field)
+[![Documentation](https://docs.rs/signed-distance-field/badge.svg)](https://docs.rs/crate/signed-distance-field/)
+
 # SIGNED-DISTANCE-FIELD-RS
 *Fast Signed Distance Fields for Rust*
 
