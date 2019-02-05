@@ -57,7 +57,7 @@ Update your `Cargo.toml`:
 signed-distance-field = { version = "0.6.2", features = [ "piston_image" ] }
 ```
 
-### Cons of the algorithm
+### Cons (yet)
 - Single Code only
 - GPU not used
 - May not as accurate as a naive approach
