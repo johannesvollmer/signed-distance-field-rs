@@ -1,7 +1,6 @@
 //! This crate approximates a signed
-//! distance field, given a binary image.
-//! The algorithm used is called "dead reckoning",
-//! as described in `The "dead reckoning" signed distance transform`
+//! distance field, given a binary image,
+//! as described in "The dead reckoning signed distance transform"
 //! by George J. Grevara (2004).
 
 pub mod binary_image;
@@ -30,17 +29,17 @@ pub mod prelude {
 
 use prelude::*;
 
-/// Compute the signed distance field with the specified distance storage of the specified binary image.
+/// Compute the signed distance field of the specified binary image with the specified distance storage.
 pub fn compute_distance_field<D: DistanceStorage>(image: &impl BinaryImage) -> SignedDistanceField<D> {
     SignedDistanceField::compute(image)
 }
 
-/// Compute the signed distance field with an `f16` distance storage of the specified binary image.
+/// Compute the signed distance field of the specified binary image with an `f16` distance storage.
 pub fn compute_f16_distance_field(image: &impl BinaryImage) -> SignedDistanceField<F16DistanceStorage> {
     compute_distance_field(image)
 }
 
-/// Compute the signed distance field with an `f32` distance storage of the specified binary image.
+/// Compute the signed distance field of the specified binary image with an `f32` distance storage.
 pub fn compute_f32_distance_field(image: &impl BinaryImage) -> SignedDistanceField<F32DistanceStorage> {
     compute_distance_field(image)
 }
