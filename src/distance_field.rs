@@ -78,7 +78,12 @@ pub struct NormalizedDistanceField<D: DistanceStorage> {
     /// The largest distance in the image
     /// to the nearest edge
     /// __inside__ of a shape
-    pub former_max_distance: f32
+    pub former_max_distance: f32,
+
+    /// A row-major image vector with
+    /// for each pixel of the original image
+    /// containing the absolute position of the nearest edge from that pixel
+    pub distance_targets: Vec<(u16, u16)>
 }
 
 
@@ -330,7 +335,8 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
             width, height,
             distances: distance_field.distances,
             zero_distance: normalize(0.0, min, max),
-            former_max_distance: max, former_min_distance: min
+            former_max_distance: max, former_min_distance: min,
+            distance_targets: distance_field.distance_targets
         })
     }
 
@@ -349,6 +355,7 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
             former_min_distance: std::f32::INFINITY,
             former_max_distance: std::f32::NEG_INFINITY,
             zero_distance: normalize(0.0, min, max), // TODO untested
+            distance_targets: distance_field.distance_targets
         };
 
         for index in 0..normalized.width as usize * normalized.height as usize {
