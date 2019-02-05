@@ -4,16 +4,18 @@ Fast Signed Distance Fields for Rust!
 
 This crate approximates a signed
 distance field, given a binary image. 
-The algorithm used is called "dead reckoning", 
-as described in `The "dead reckoning" signed distance transform`
+The algorithm is inspired by the paper
+"The dead reckoning signed distance transform"
 by George J. Grevara (2004). 
 
 The complexity of the algorithm
 is linear, while an exact algorithm
 would have quadratic complexity.
 
-On my machine, the distance field of an image with
-4096 * 4096 (16 Megapixels) pixels can be computed in about 1.14 seconds.
+On my laptop, the distance field of an image with
+4096 * 4096 pixels (16 Megapixels) 
+containing a circle with radius 6 in the center 
+can be computed in about 0.927 seconds.
 
 ## Features
 In the process of computing the signed distance field, 

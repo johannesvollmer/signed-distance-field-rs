@@ -77,35 +77,38 @@ mod tests {
 
     #[test]
     pub fn reconstruct_circle(){
-        reconstruct_binary_image::<F16DistanceStorage, _>(
-            2048, 2048, 0.05, is_inside_circle(128, 128, 64)
-        );
+        reconstruct_binary_image(2048, 2048, 0.05, is_inside_circle(128, 128, 64));
     }
 
     #[test]
-    pub fn reconstruct_dot(){ // TODO profile this
-        reconstruct_binary_image::<F16DistanceStorage, _>(
-            2048, 2048, 0.05, is_inside_circle(1024, 1024, 4)
-        );
+    pub fn reconstruct_dot(){
+        reconstruct_binary_image(2048, 2048, 0.05, is_inside_circle(1024, 1024, 4));
+    }
+
+    #[test]
+    pub fn reconstruct_top_left(){
+        reconstruct_binary_image(2048, 2048, 0.05, is_inside_circle(0, 0, 14));
+    }
+
+    #[test]
+    pub fn reconstruct_top_right(){
+        reconstruct_binary_image(2048, 2048, 0.05, is_inside_circle(2048, 0, 14));
     }
 
     #[test]
     pub fn reconstruct_rectangle(){
-        reconstruct_binary_image::<F32DistanceStorage, _>(
-            2048, 2048, 0.05, is_inside_rectangle(179, 179, 37, 37)
-        );
+        reconstruct_binary_image(2048, 2048, 0.05, is_inside_rectangle(179, 179, 37, 37));
     }
 
     #[test]
     pub fn reconstruct_stripes(){
-        reconstruct_binary_image::<F32DistanceStorage, _>(
-            2048, 2048, 0.07, is_inside_checker(179, 37)
-        );
+        reconstruct_binary_image(2048, 2048, 0.07, is_inside_checker(179, 37));
     }
 
 
-    fn reconstruct_binary_image<D: DistanceStorage, I: Fn(usize, usize) -> bool>(
-        width: usize, height: usize, tolerance: f32, image: I
+    fn reconstruct_binary_image(
+        width: usize, height: usize, tolerance: f32,
+        image: impl Fn(usize, usize) -> bool
     ) {
         let mut binary_image_buffer = vec![0_u8; width * height];
 
@@ -119,13 +122,22 @@ mod tests {
             width as u16, height as u16, &binary_image_buffer
         );
 
-        let distance_field: SignedDistanceField<D> = crate::compute_distance_field(&binary_image);
+        let distance_field_16 = SignedDistanceField::<F16DistanceStorage>::compute(&binary_image);
+        let distance_field_32 = SignedDistanceField::<F32DistanceStorage>::compute(&binary_image);
 
         let mut wrong_pixels = 0;
         for y in 0..height as u16 {
             for x in 0..width as u16 {
                 let ground_truth = binary_image.is_inside(x, y);
-                let reconstructed = distance_field.get_distance(x, y) < 0.0;
+                let distance_16 = distance_field_16.get_distance(x, y);
+                let distance_32 = distance_field_32.get_distance(x, y);
+                let distance = (distance_16 + distance_32) / 2.0;
+
+                if distance.is_infinite() {
+                    panic!("no shape in binary image");
+                }
+
+                let reconstructed = distance < 0.0;
                 if ground_truth != reconstructed {
                     wrong_pixels += 1;
                 }
@@ -141,7 +153,9 @@ mod tests {
 
 
 
-    fn circle_distance(center_x: usize, center_y: usize, radius: usize) -> impl Fn(usize, usize) -> f32 {
+    fn circle_distance(center_x: usize, center_y: usize, radius: usize)
+        -> impl Fn(usize, usize) -> f32
+    {
         move |x,y|{
             let x = (x as isize - center_x as isize) as f32;
             let y = (y as isize - center_y as isize) as f32;
@@ -149,40 +163,46 @@ mod tests {
         }
     }
 
-    fn rectangle_distance(center_x: usize, center_y: usize, width: usize, height: usize) -> impl Fn(usize, usize) -> f32 {
+    fn rectangle_distance(center_x: usize, center_y: usize, width: usize, height: usize)
+        -> impl Fn(usize, usize) -> f32
+    {
         move |x,y|{
             let x = x as f32 - center_x as f32;
             let y = y as f32 - center_y as f32;
             let x = x.abs() - width as f32;
             let y = y.abs() - height as f32;
-            x.max(y)
+            x.min(y)
         }
     }
 
     #[test]
     pub fn reconstruct_circle_distance_field(){
-        reconstruct_distance_field::<F16DistanceStorage, _>(
-            2048, 2048, 2.0, circle_distance(128, 128, 128)
-        );
+        reconstruct_distance_field(2048, 2048, 2.0, circle_distance(128, 128, 128));
     }
 
     #[test]
     pub fn reconstruct_dot_distance_field(){
-        reconstruct_distance_field::<F16DistanceStorage, _>(
-            2048, 2048, 2.0, circle_distance(128, 128, 4)
-        );
+        reconstruct_distance_field(2048, 2048, 2.0, circle_distance(128, 128, 4));
     }
 
     #[test]
     pub fn reconstruct_rectangle_distance_field(){
-        reconstruct_distance_field::<F16DistanceStorage, _>(
-            2048, 2048, 130.0, // FIXME an error of 130.0 pixeldistance per pixel is a bug
-            rectangle_distance(179, 179, 137, 137)
-        );
+        reconstruct_distance_field(2048, 2048, 2.0, rectangle_distance(1023, 179, 137, 137));
     }
 
-    pub fn reconstruct_distance_field<D: DistanceStorage, I: Fn(usize, usize) -> f32>(
-        width: usize, height: usize, tolerance: f32, image: I
+    #[test]
+    pub fn reconstruct_large_rectangle_distance_field(){ // TODO reduce error further?
+        reconstruct_distance_field(2048, 2048, 25.0, rectangle_distance(1024, 1023, 613, 673));
+    }
+
+    #[test]
+    pub fn reconstruct_small_rectangle_distance_field(){
+        reconstruct_distance_field(2048, 2048, 2.0, rectangle_distance(179, 1023, 4, 7));
+    }
+
+    pub fn reconstruct_distance_field(
+        width: usize, height: usize, tolerance: f32,
+        image: impl Fn(usize, usize) -> f32
     ) {
         let mut distance_buffer = vec![0.0; width * height];
 
@@ -200,16 +220,19 @@ mod tests {
             width as u16, height as u16, &binary_image_buffer
         );
 
-        let distance_field: SignedDistanceField<D> = crate::compute_distance_field(&binary_image);
+        let distance_field_16 = SignedDistanceField::<F16DistanceStorage>::compute(&binary_image);
+        let distance_field_32 = SignedDistanceField::<F32DistanceStorage>::compute(&binary_image);
 
         let mut summed_error = 0.0;
         for y in 0..height as u16 {
             for x in 0..width as u16 {
                 let ground_truth = distance_buffer[y as usize * width + x as usize];
-                let reconstructed = distance_field.get_distance(x, y);
+                let reconstructed_16 = distance_field_16.get_distance(x, y);
+                let reconstructed_32 = distance_field_32.get_distance(x, y);
+                let reconstructed = (reconstructed_16 + reconstructed_32) / 2.0;
 
                 if reconstructed.is_infinite() {
-                    panic!("infinite distance at {} {}", x, y);
+                    panic!("no shape in binary image");
                 }
 
                 summed_error += (ground_truth - reconstructed).abs();

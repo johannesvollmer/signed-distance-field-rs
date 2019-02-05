@@ -5,6 +5,8 @@ use crate::binary_image::BinaryImage;
 /// Can be normalized in order to convert to an image with limited range.
 /// The type parameter `D` can be used to customize the memory layout of the distance field.
 /// The default storages are `Vec<f23>` and `Vec<f16>`.
+///
+/// If any distance in this field is `INFINITY`, no shapes were found in the binary image.
 #[derive(Clone, PartialEq, Debug)]
 pub struct SignedDistanceField<D: DistanceStorage> {
     pub width: u16,
@@ -97,7 +99,7 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
                     || is_at_edge(binary_image, x, y,  0, -1)
                     || is_at_edge(binary_image, x, y,  0,  1)
                 {
-                    distance_field.set_target_and_distance(x, y, x, y, 0.0);
+                    distance_field.set_target_with_distance(x, y, x, y, 0.0);
                 }
             }
         }
@@ -105,50 +107,38 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         // perform forwards iteration
         for y in 0..height {
             for x in 0..width {
-                let mut distance = distance_field.get_distance(x, y);
-                let (mut target_x, mut target_y) = distance_field.get_distance_target(x, y);
+                // encourage auto vectorization and fetching all distances in parallel
+                let left_bottom  = distance_field.distance_by_neighbour(x, y, -1, -1);
+                let bottom       = distance_field.distance_by_neighbour(x, y,  0, -1);
+                let right_bottom = distance_field.distance_by_neighbour(x, y,  1, -1);
+                let left         = distance_field.distance_by_neighbour(x, y, -1,  0);
+                let mut own      = distance_field.get_distance(x, y);
 
-                distance_field.update_distance(x, y, -1, -1, &mut distance, &mut target_x, &mut target_y);
-                distance_field.update_distance(x, y,  0, -1, &mut distance, &mut target_x, &mut target_y);
-                distance_field.update_distance(x, y,  1, -1, &mut distance, &mut target_x, &mut target_y);
-                distance_field.update_distance(x, y, -1,  0, &mut distance, &mut target_x, &mut target_y);
-
-                // write unconditionally to avoid branching,
-                // as almost all values will be written in the first pass
-                distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
+                // if any of the neighbour is smaller, update ourselves
+                // TODO only write the true smallest instead of overwriting previous distances?
+                if left_bottom  < own { own = distance_field.take_neighbour_target(x, y, -1, -1); }
+                if bottom       < own { own = distance_field.take_neighbour_target(x, y,  0, -1); }
+                if right_bottom < own { own = distance_field.take_neighbour_target(x, y,  1, -1); }
+                if left         < own {       distance_field.take_neighbour_target(x, y, -1,  0); }
             }
         }
 
-        // perform backwards iteration.
-        // Similar to first iteration, but only writes conditionally,
-        // as not all pixels will be updated in this iteration
-        // which will save us some f16 conversion and heap writes
+        // perform backwards iteration
         for y in (0..height).rev() {
             for x in (0..width).rev() {
-                let mut distance = distance_field.get_distance(x, y);
-                let (mut target_x, mut target_y) = distance_field.get_distance_target(x, y);
+                // encourage auto vectorization and fetching all distances in parallel
+                let right    = distance_field.distance_by_neighbour(x, y,  1,  0);
+                let top_left = distance_field.distance_by_neighbour(x, y, -1,  1);
+                let top      = distance_field.distance_by_neighbour(x, y,  0,  1);
+                let top_right= distance_field.distance_by_neighbour(x, y,  1,  1);
+                let mut own  = distance_field.get_distance(x, y);
 
-                let right = distance_field.update_distance(
-                    x, y,  1,  0, &mut distance, &mut target_x, &mut target_y
-                );
-
-                let top_left = distance_field.update_distance(
-                    x, y, -1,  1, &mut distance, &mut target_x, &mut target_y
-                );
-
-                let top = distance_field.update_distance(
-                    x, y,  0,  1, &mut distance, &mut target_x, &mut target_y
-                );
-
-                let top_right = distance_field.update_distance(
-                    x, y,  1,  1, &mut distance, &mut target_x, &mut target_y
-                );
-
-                // only write if something changed, as the second pass may touch few pixels
-                // (profiled with an image of a circle)
-                if right || top_left || top || top_right {
-                    distance_field.set_target_and_distance(x,y, target_x, target_y, distance);
-                }
+                // if any of the neighbour is smaller, update ourselves
+                // TODO only write the true smallest instead of overwriting previous distances?
+                if right     < own { own = distance_field.take_neighbour_target(x, y,  1,  0); }
+                if top_left  < own { own = distance_field.take_neighbour_target(x, y, -1,  1); }
+                if top       < own { own = distance_field.take_neighbour_target(x, y,  0,  1); }
+                if top_right < own {       distance_field.take_neighbour_target(x, y,  1,  1); }
             }
         }
 
@@ -165,38 +155,27 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
         distance_field
     }
 
-    /// Returns true, if the mutable values have been changed should be updated
+    /// Returns a potentially smaller distance, based on the neighbour's distance.
+    /// If there is no neighbour (at the bounds of the image), `INFINITY` is returned.
     #[inline(always)]
-    fn update_distance(
-        &mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32,
-        own_distance: &mut f32, own_target_x: &mut u16, own_target_y: &mut u16
-    ) -> bool
-    {
+    fn distance_by_neighbour(&mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32, ) -> f32 {
         // this should be const per function call, as `neighbour` is const per function call
         let distance_to_neighbour = length(neighbour_x, neighbour_y);
-
         let neighbour_x = x as i32 + neighbour_x;
         let neighbour_y = y as i32 + neighbour_y;
 
-        // if neighbour exists, update ourselves according to the neighbour
+        // if neighbour exists, return the potentially smaller distance to the target
         if is_valid_index(neighbour_x, neighbour_y, self.width, self.height) {
-            let neighbour_x = neighbour_x as u16;
-            let neighbour_y = neighbour_y as u16;
-            let neighbour_distance = self.get_distance(neighbour_x, neighbour_y);
+            let neighbours_distance = self.get_distance(
+                neighbour_x as u16, neighbour_y as u16
+            );
 
-            // if neighbour is closer to edge than ourselves,
-            // set our distance to the neighbours distance plus the space between us
-            if neighbour_distance + distance_to_neighbour < *own_distance {
-                let neighbour_target = self.get_distance_target(neighbour_x, neighbour_y);
-
-                *own_distance = distance(x, y, neighbour_target.0, neighbour_target.1);
-                *own_target_x = neighbour_target.0;
-                *own_target_y = neighbour_target.1;
-                return true
-            }
+            neighbours_distance + distance_to_neighbour
         }
 
-        false
+        else {
+            std::f32::INFINITY
+        }
     }
 
     /// Returns the distance of the specified pixel to the nearest edge in the original image.
@@ -213,10 +192,29 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
 
     /// Update the distance and target field at the specified pixel index
     #[inline(always)]
-    fn set_target_and_distance(&mut self, x: u16, y: u16, target_x: u16, target_y: u16, distance: f32) {
+    fn set_target_with_distance(&mut self, x: u16, y: u16, target_x: u16, target_y: u16, distance: f32) {
         let index = self.flatten_index(x, y);
         self.distances.set(index, distance);
         self.distance_targets[index] = (target_x, target_y);
+    }
+
+    /// Update the target field at the specified pixel index and compute the distance
+    #[inline(always)]
+    fn set_target_and_distance(&mut self, x: u16, y: u16, target_x: u16, target_y: u16) -> f32 {
+        let distance = distance(x, y, target_x, target_y);
+        self.set_target_with_distance(x, y, target_x, target_y, distance);
+        distance
+    }
+
+    #[inline(always)]
+    fn take_neighbour_target(&mut self, x: u16, y: u16, neighbour_x: i32, neighbour_y: i32) -> f32 {
+        debug_assert!(x as i32 + neighbour_x >= 0 && y as i32 + neighbour_y >= 0);
+        let target_of_neighbour = self.get_distance_target(
+            (x as i32 + neighbour_x) as u16,
+            (y as i32 + neighbour_y) as u16
+        );
+
+        self.set_target_and_distance(x, y, target_of_neighbour.0, target_of_neighbour.1)
     }
 
     #[inline(always)]
@@ -227,7 +225,8 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
 
     /// Convert x and y pixel coordinates to the corresponding
     /// one-dimensional index in a row-major image vector.
-    #[inline]
+    // Always inline so that the result of self.flatten_index() can be reused in consecutive calls
+    #[inline(always)]
     pub fn flatten_index(&self, x: u16, y: u16) -> usize {
         debug_assert!(
             is_valid_index(x as i32, y as i32, self.width, self.height),
@@ -260,8 +259,7 @@ fn is_at_edge(image: &impl BinaryImage, x: u16, y: u16, neighbour_x: i32, neighb
 /// The length of a vector with x and y coordinates.
 #[inline]
 fn length(x: i32, y: i32) -> f32 {
-    let sqr_distance = x * x + y * y;
-    (sqr_distance as f32).sqrt()
+    ((x * x + y * y) as f32).sqrt()
 }
 
 /// The distance between to points with x and y coordinates.
