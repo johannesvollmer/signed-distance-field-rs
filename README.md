@@ -37,7 +37,7 @@ signed distance field.
 
 
 ```rust
-use sdf_dead_reckoning::prelude::*;
+use signed_distance_field::prelude::*;
     
 fn main(){
     let mut gray_image = image::open("images/sketch.jpg").unwrap().to_luma();
