@@ -1,20 +1,15 @@
 # SIGNED-DISTANCE-FIELD-RS
-
-Fast Signed Distance Fields for Rust!
+*Fast Signed Distance Fields for Rust*
 
 This crate approximates a signed
 distance field, given a binary image. 
 The algorithm is inspired by the paper
 "The dead reckoning signed distance transform"
-by George J. Grevara (2004). 
-
-The complexity of the algorithm
-is linear, while an exact algorithm
-would have quadratic complexity.
+by George J. Grevara (2004).
 
 On my laptop, the distance field of an image with
-4096 * 4096 pixels (16 Megapixels) 
-containing a circle with radius 6 in the center 
+4096px x 4096px (16 Megapixels) 
+containing a circle with radius of 6px in the center 
 can be computed in about 0.927 seconds.
 
 ## Features
@@ -23,20 +18,16 @@ the algorithm constructs an image with each pixel
 containing the vectors which point to the nearest edge. 
 This vector distance field is made available
 after computing the plain distance field and can be used 
-for further processing.
-
-## Piston Images
-This library can be configured to offer some 
-simple conversions to and from piston images.
-The feature flag `piston_image` unlocks these functions.
-The image crate is not required to calculate the
-signed distance field. 
+for further processing. Also, the library offers a simple
+conversion from distance fields to images with integer precision.
 
 
 ## Getting Started
 
-<!-- TODO: dependency with piston image feature-->
-
+Update your `Cargo.toml`:
+```toml
+signed-distance-field = "0.6.2"
+```
 
 ```rust
 use signed_distance_field::prelude::*;
@@ -50,15 +41,27 @@ fn main(){
 
     distance_image.save("images/sketch_distance.png").unwrap();
 }
-
 ```
 
-Note: To run this specific example, 
-use sdf-dead-reckoning with the piston image crate feature, 
-by enabling the feature flag `piston_image`.
+To run this specific example, the `piston_image` feature flag must be enabled.
 
-## TODO
-- [x] Enable customized memory destination 
-      instead of predefined allocations
-- [ ] Real Profiling and Benchmarking
-- [ ] Consider SIMD and Multithread optimization?
+## Piston Images
+This library can be configured to offer some 
+simple conversions to and from piston images.
+The feature flag `piston_image` unlocks these functions.
+The image crate is not required to calculate the
+signed distance field. 
+
+Update your `Cargo.toml`:
+```toml
+signed-distance-field = { version = "0.6.2", features = [ "piston_image" ] }
+```
+
+### Cons of the algorithm
+- Single Code only
+- GPU not used
+- May not as accurate as a naive approach
+
+### What's up next?
+- Consider optimizing for SIMD and multithreading
+- Consider adding alternative algorithms, possibly with GPU utilization
