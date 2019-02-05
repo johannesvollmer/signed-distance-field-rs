@@ -10,7 +10,8 @@ by George J. Grevara (2004).
 On my laptop, the distance field of an image with
 4096px x 4096px (16 Megapixels) 
 containing a circle with radius of 6px in the center 
-can be computed in about 0.927 seconds.
+can be computed in about 0.927 seconds. Don't forget
+to compile in release mode!
 
 ## Features
 In the process of computing the signed distance field, 
