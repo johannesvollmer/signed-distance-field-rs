@@ -18,6 +18,8 @@ exclude = [
 ]
 
 
+[badges]
+maintenance = { status = "passively-maintained" }
 
 [features]
 piston_image = [ "image" ]
