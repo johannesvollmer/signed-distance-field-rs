@@ -64,7 +64,7 @@ signed-distance-field = { version = "0.6.2", features = [ "piston_image" ] }
 ### Cons (yet)
 - Single Code only
 - GPU not used
-- May not as accurate as a naive approach
+- Maybe not as accurate as a naive approach
 
 ### What's up next?
 - Consider optimizing for SIMD and multithreading
