@@ -247,17 +247,17 @@ impl<D> SignedDistanceField<D> where D: DistanceStorage {
     /// Scales all distances such that the smallest distance is zero and the largest is one.
     /// Also computes the former minimum and maximum distance, as well as the new edge-value.
     /// Returns `None` if the binary image did not contain any shapes.
-    pub fn normalize_distances(self) -> NormalizedDistanceField<D> {
+    pub fn normalize_distances(self) -> Option<NormalizedDistanceField<D>> {
         NormalizedDistanceField::normalize(self)
     }
 
-    /// Scales all distances such that the `-max` distances are zero and `max` distances are one.
-    /// All distances smaller than `-max` and larger than `max` will be clamped.
+    /// Scales all distances such that the `min` distances are zero and `max` distances are one.
+    /// All distances smaller than `min` and larger than `max` will be clamped.
     /// Edges (formerly zero-distances) will be at the center, put to `0.5`.
     /// Also collects the former minimum and maximum distance.
     /// Returns `None` if the binary image did not contain any shapes.
-    pub fn normalize_clamped_distances(self, max: f32) -> NormalizedDistanceField<D> {
-        NormalizedDistanceField::normalize_clamped(self, max)
+    pub fn normalize_clamped_distances(self, min: f32, max: f32) -> Option<NormalizedDistanceField<D>> {
+        NormalizedDistanceField::normalize_clamped(self, min, max)
     }
 }
 
@@ -312,12 +312,8 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
 
         let (min, max) = (0..width as usize * height as usize)
             .map(|index| distance_field.distances.get(index))
-            .fold(
-                (std::f32::INFINITY, std::f32::NEG_INFINITY),
-                |(min, max), distance| (
-                    min.min(distance),
-                    max.max(distance)
-                )
+            .fold((std::f32::INFINITY, std::f32::NEG_INFINITY), |(min, max), distance|
+                (min.min(distance), max.max(distance))
             );
 
         if min.is_infinite() || max.is_infinite() {
@@ -333,24 +329,26 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
         Some(NormalizedDistanceField {
             width, height,
             distances: distance_field.distances,
-            zero_distance: (0.0 - min) / (max - min), // FIXME untested
+            zero_distance: normalize(0.0, min, max),
             former_max_distance: max, former_min_distance: min
         })
     }
 
-    /// Scales all distances such that the `-max` distances are zero and `max` distances are one.
-    /// All distances smaller than `-max` and larger than `max` will be clamped.
-    /// Edges (formerly zero-distances) will be at the center, put to `0.5`.
+    /// Scales all distances such that the `min` distances are zero and `max` distances are one.
+    /// All distances smaller than `min` and larger than `max` will be clamped.
+    /// Edges (formerly zero-distances) will be put at exactly the middle between `min` and `max`,
+    /// being `0.5` if `min == -max`.
+    ///
     /// Also collects the former minimum and maximum distance.
     /// Returns `None` if the binary image did not contain any shapes.
-    pub fn normalize_clamped(distance_field: SignedDistanceField<D>, max: f32) -> Option<Self> {
+    pub fn normalize_clamped(distance_field: SignedDistanceField<D>, min: f32, max: f32) -> Option<Self> {
         let mut normalized = NormalizedDistanceField {
             width: distance_field.width,
-            height: distance_field.width,
+            height: distance_field.height,
             distances: distance_field.distances,
             former_min_distance: std::f32::INFINITY,
             former_max_distance: std::f32::NEG_INFINITY,
-            zero_distance: 0.5,
+            zero_distance: normalize(0.0, min, max), // TODO untested
         };
 
         for index in 0..normalized.width as usize * normalized.height as usize {
@@ -360,8 +358,8 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
             normalized.former_max_distance = normalized.former_max_distance.max(distance);
             normalized.former_min_distance = normalized.former_min_distance.min(distance);
 
-            let clamped = distance.min(max).max(-max);
-            let normalized_distance = normalize(clamped, -max, max);
+            let clamped = distance.min(max).max(min);
+            let normalized_distance = normalize(clamped, min, max);
             normalized.distances.set(index, normalized_distance);
         }
 
@@ -371,14 +369,14 @@ impl<D> NormalizedDistanceField<D> where D: DistanceStorage {
     /// Convert the normalized distance to an `u8` image with the range fully utilized.
     pub fn to_u8(&self) -> Vec<u8> {
         (0..self.width as usize * self.height as usize)
-            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u8::MAX) as u8)
+            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u8::MAX as f32) as u8)
             .collect()
     }
 
     /// Convert the normalized distance to an `u16` image with the range fully utilized.
     pub fn to_u16(&self) -> Vec<u16> {
         (0..self.width as usize * self.height as usize)
-            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u16::MAX) as u16)
+            .map(|index| (self.distances.get(index).min(1.0).max(0.0) * std::u16::MAX as f32) as u16)
             .collect()
     }
 
