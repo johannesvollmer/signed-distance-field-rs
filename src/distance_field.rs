@@ -91,6 +91,101 @@ pub struct NormalizedDistanceField<D: DistanceStorage> {
 
 impl<D> SignedDistanceField<D> where D: DistanceStorage {
 
+    /// As in the paper by Meijster, sould be SIMDifyable and threadable
+    pub fn exact(binary_image: &impl BinaryImage) -> Self {
+        let width = binary_image.width();
+        let height = binary_image.height();
+        let infinity = width + height;
+
+        let mut g = vec![0_u16; width * height];
+
+        // vertical passes
+        {
+            for x in 0..width {
+                if !binary_image.is_inside(x, 0) {
+                    g[(x, y)] = infinity;
+                }
+            }
+
+            for y in 1..height {
+                for x in 0..width {
+                    if !binary_image.is_inside(x, y) {
+                        g[(x, y)] =  1 + g[(x, y)] - 1;
+                    }
+                }
+            }
+
+            for y in (0..height - 1).rev() {
+                for x in 0..width {
+                    let below = g[(x, y + 1)];
+                    if g[(x, y)] > below {
+                        g[(x, y)] = 1 + below;
+                    }
+                }
+            }
+        }
+
+        #[inline(always)]
+        fn euclidean_f(x: u16, i: u16, g_i: u16) -> u16 {
+            let x = x - i;
+            x * x + g_i * g_i
+        }
+
+        #[inline(always)]
+        fn euclidean_sep(i: u16, u: u16, g_i: u16, g_u: u16) -> u16 {
+            (u * u - i * i + g_u * g_u - g_i * g_i) / 2 * (u - i)
+        }
+
+
+        let mut distance_field = SignedDistanceField {
+            width, height,
+            distances: D::new(width as usize * height as usize),
+            distance_targets: vec![(0, 0); width as usize * height as usize],
+        };
+
+        // final pass
+        let mut s = vec![0; width];
+        let mut t = vec![0; width];
+        for y in 0..height {
+            let mut q = 0;
+            s[0] = 0;
+            t[0] = 0;
+
+            for u in 1..width {
+                while q >= 0 && euclidean_f(t[q], s[q], g[(s[q], y)]) > euclidean_f(t[q], u, g[(u, y)]) {
+                    q -= 1;
+                }
+
+                if q < 0 {
+                    q = 0;
+                    s[0] = u;
+                }
+                else {
+                    w = 1 + euclidean_sep(s[q], u, g[(s[q], y)], g[(u, y)]);
+                    if w < m {
+                        q += 1;
+                        s[q] = u;
+                        t[q] = w;
+                    }
+                }
+            }
+
+            for u in (0..width).rev() {
+                let d = euclidean_f(u, s[q], f[(s[q], y)]);
+                let d = (d as f32).sqrt();
+                distance_field.set_distance(u, y, d);
+                if u == t[q] {
+                    q -= 1;
+                }
+            }
+        }
+
+
+        distance_field
+    }
+
+
+
     /// Approximates the signed distance field of the specified image.
     /// The algorithm used is based on the paper "The dead reckoning signed distance transform"
     /// by George J. Grevara, 2004.
