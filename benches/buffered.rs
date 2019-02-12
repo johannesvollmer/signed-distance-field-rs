@@ -1,6 +1,7 @@
 #![feature(test)]
 extern crate test;
 
+
 #[cfg(test)]
 mod benches {
     use signed_distance_field::prelude::*;
@@ -32,38 +33,51 @@ mod benches {
         }
     }
 
-    fn compute(bencher: &mut Bencher, compute: impl Fn(&BinaryByteImage) -> SignedDistanceField<F32DistanceStorage>) {
+    fn compute_various<D>(bencher: &mut Bencher) where D: DistanceStorage {
         let width = 1080;
         let height = 1920;
 
         for sdf in &[
             circle(width/2, height/2, 6),
-            circle(width/2, height/2, width/3),
+            circle(width/2, height/2, height/3),
             circle(0, 0, 35),
             circle(width, 0, 35),
         ] {
             let image_buffer = byte_image_from_function(width, height, sdf);
-            let binary = BinaryByteImage::from_slice(width as u16, height as u16, &image_buffer);
+            let binary = binary_image::of_byte_slice(&image_buffer, width as u16, height as u16);
 
-            bencher.iter(|| compute(&binary));
+            bencher.iter(|| SignedDistanceField::<D>::compute(&binary));
         }
     }
 
-
-    #[bench]
-    fn bench_various(bencher: &mut Bencher) {
-        compute(bencher, |img| SignedDistanceField::<F32DistanceStorage>::compute(img));
-    }
-
-    #[bench]
-    fn bench_single_16mp(bencher: &mut Bencher) {
+    fn compute_highres<D>(bencher: &mut Bencher) where D: DistanceStorage {
         let width = 4096;
         let height = 4096;
 
         let image_buffer = byte_image_from_function(width, height, circle(width/2, height/2, 6));
-        let binary = BinaryByteImage::from_slice(width as u16, height as u16, &image_buffer);
+        let binary = binary_image::of_byte_slice(&image_buffer, width as u16, height as u16);
+        bencher.iter(|| SignedDistanceField::<D>::compute(&binary));
+    }
 
-        bencher.iter(|| SignedDistanceField::<F32DistanceStorage>::compute(&binary));
+
+    #[bench]
+    fn bench_various_f16(bencher: &mut Bencher) {
+        compute_various::<F16DistanceStorage>(bencher);
+    }
+
+    #[bench]
+    fn bench_various_f32(bencher: &mut Bencher) {
+        compute_various::<F32DistanceStorage>(bencher);
+    }
+
+    #[bench]
+    fn bench_highres_f16(bencher: &mut Bencher) {
+        compute_highres::<F16DistanceStorage>(bencher);
+    }
+
+    #[bench]
+    fn bench_highres_f32(bencher: &mut Bencher) {
+        compute_highres::<F32DistanceStorage>(bencher);
     }
 
 }

@@ -65,9 +65,9 @@ signed-distance-field = { version = "0.6.2", features = [ "piston_image" ] }
 ```
 
 ### Cons (yet)
-- Single Code only
-- GPU not used
+- Single Core only
 - Maybe not as accurate as a naive approach
+- Neither GPU not SIMD acceleration explicitly used
 
 ### What's up next?
 - Consider optimizing for SIMD and multithreading

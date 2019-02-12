@@ -7,27 +7,30 @@ pub mod binary_image;
 pub mod distance_field;
 
 pub mod prelude {
+    pub use crate::binary_image::{ self, BinaryImage };
+
+    #[cfg(feature = "piston_image")]
+    pub use crate::binary_image::piston_image
+        as binary_piston_image;
+
+    pub use crate::distance_field::{
+        SignedDistanceField,
+        NormalizedDistanceField,
+        F16DistanceStorage,
+        F32DistanceStorage,
+        DistanceStorage,
+    };
+
     pub use crate::{
-        compute_distance_field,
         compute_f16_distance_field,
         compute_f32_distance_field
     };
-
-    pub use crate::binary_image::{
-        BinaryImage, BinaryByteImage
-    };
-
-    pub use crate::distance_field::{
-        SignedDistanceField, DistanceStorage,
-        F16DistanceStorage, F32DistanceStorage
-    };
-
-    #[cfg(feature = "piston_image")]
-    pub use crate::binary_image::piston_image as binary_piston_image;
 }
 
 
 use prelude::*;
+use crate::distance_field::DistanceStorage;
+use crate::binary_image::BinaryImage;
 
 /// Compute the signed distance field of the specified binary image with the specified distance storage.
 pub fn compute_distance_field<D: DistanceStorage>(image: &impl BinaryImage) -> SignedDistanceField<D> {
@@ -109,6 +112,7 @@ mod tests {
         width: usize, height: usize, tolerance: f32,
         image: impl Fn(usize, usize) -> bool
     ) {
+        use crate::binary_image::BinaryImage;
         let mut binary_image_buffer = vec![0_u8; width * height];
 
         for y in 0..height {
@@ -117,12 +121,12 @@ mod tests {
             }
         }
 
-        let binary_image = BinaryByteImage::from_slice(
-            width as u16, height as u16, &binary_image_buffer
+        let binary_image = binary_image::of_byte_slice(
+            &binary_image_buffer, width as u16, height as u16
         );
 
-        let distance_field_16 = SignedDistanceField::<F16DistanceStorage>::compute(&binary_image);
-        let distance_field_32 = SignedDistanceField::<F32DistanceStorage>::compute(&binary_image);
+        let distance_field_16 = compute_f32_distance_field(&binary_image);
+        let distance_field_32 = compute_f16_distance_field(&binary_image);
 
         let mut wrong_pixels = 0;
         for y in 0..height as u16 {
@@ -215,12 +219,12 @@ mod tests {
             .map(|distance| if *distance < 0.0 { 255 } else { 0 })
             .collect();
 
-        let binary_image = BinaryByteImage::from_slice(
-            width as u16, height as u16, &binary_image_buffer
+        let binary_image = binary_image::of_byte_slice(
+            &binary_image_buffer, width as u16, height as u16
         );
 
-        let distance_field_16 = SignedDistanceField::<F16DistanceStorage>::compute(&binary_image);
-        let distance_field_32 = SignedDistanceField::<F32DistanceStorage>::compute(&binary_image);
+        let distance_field_16 = compute_f32_distance_field(&binary_image);
+        let distance_field_32 = compute_f16_distance_field(&binary_image);
 
         let mut summed_error = 0.0;
         for y in 0..height as u16 {
