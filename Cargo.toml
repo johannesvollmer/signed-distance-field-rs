@@ -8,7 +8,7 @@ categories = ["algorithms", "graphics", "gui", "multimedia::images", "encoding"]
 keywords = ["signed", "distance", "vector", "field", "sdf"]
 authors = ["johannesvollmer"]
 
-# TODO documentation = "..."
+documentation = "https://docs.rs/crate/signed-distance-field/"
 repository = "https://github.com/johannesvollmer/sdf-dead-reckoning"
 readme = "README.md"
 license = "MIT"

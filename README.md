@@ -25,39 +25,40 @@ conversion from distance fields to images with integer precision.
 
 Update your `Cargo.toml`:
 ```toml
-signed-distance-field = "0.6.3"
+signed-distance-field = { version = "0.6.3", features = [ "piston_image" ] }
 ```
-
-Use `compute_f32_distance_field` to compute 
-a distance field with `f32` precision and memory usage.
 
 ```rust
 use signed_distance_field::prelude::*;
     
 fn main(){
-    let mut gray_image = image::open("images/sketch.jpg").unwrap().to_luma();
-    let binary_image = binary_piston_image::of_gray_u8_image_with_threshold(&gray_image, 80);
+    // load data using piston image
+    let mut gray_image = image::open("sketch.jpg").unwrap().to_luma();
 
+    // interpret grayscale image as binary image with any pixel brighter than 80 being 'on'
+    let binary_image = binary_piston_image::of_gray_image_with_threshold(&gray_image, 80);
+
+    // convert the binary image to a distance field
     let distance_field = compute_f32_distance_field(&binary_image);
-    let distance_image = distance_field.normalize_distances().unwrap().to_gray_u8_image();
 
-    distance_image.save("images/sketch_distance.png").unwrap();
+    // compress all distances between -10 and 10 into a byte array while clipping greater distances
+    let distance_image = distance_field
+        .normalize_clamped_distances(-10.0, 10.0)
+
+        // convert f32 distance field to u8 piston image
+        .unwrap().to_gray_u8_image(); 
+
+    // save the piston image as png
+    distance_image.save("sketch_distance.png").unwrap();
 }
 ```
-
-To run this specific example, the `piston_image` feature flag must be enabled.
 
 ## Piston Images
 This library can be configured to offer some 
 simple conversions to and from piston images.
 The feature flag `piston_image` unlocks these functions.
 The image crate is not required to calculate the
-signed distance field. 
-
-Update your `Cargo.toml`:
-```toml
-signed-distance-field = { version = "0.6.2", features = [ "piston_image" ] }
-```
+signed distance field, including piston image is truly optional. 
 
 ### Cons (yet)
 - Single Core only
