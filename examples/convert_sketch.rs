@@ -12,7 +12,9 @@ fn main(){
     // convert binary image to distance field
     let distance_field = compute_f32_distance_field(&binary_image);
 
-    // compress all distances between -10 and 10 into a byte array while clipping greater distances
+    // clip all distances greater than 10px and compress them into a byte array
+    // so that a distance of -10px is 0 and a distance of 10px is 255
+    // (edges, having a distance of 0px, will be 128)
     let distance_image = distance_field
         .normalize_clamped_distances(-10.0, 10.0)
         .unwrap().to_gray_u8_image(); // convert to piston image
