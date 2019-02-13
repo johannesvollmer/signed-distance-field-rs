@@ -1,9 +1,9 @@
 [package]
 name = "signed-distance-field"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2018"
 
-description = "Fast signed distance fields algorithm using `dead reckoning`"
+description = "Fast signed distance fields from binary images using `dead reckoning`"
 categories = ["algorithms", "graphics", "gui", "multimedia::images", "encoding"]
 keywords = ["signed", "distance", "vector", "field", "sdf"]
 authors = ["johannesvollmer"]

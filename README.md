@@ -8,12 +8,7 @@ This crate approximates a signed
 distance field, given a binary image. 
 The algorithm is inspired by the paper
 "The dead reckoning signed distance transform"
-by George J. Grevara (2004).
-
-On my laptop, the distance field of an image with
-4096px x 4096px (16 Megapixels) 
-containing a circle with radius of 6px in the center 
-can be computed in about 0.927 seconds. Don't forget
+by George J. Grevara (2004). Don't forget
 to compile in release mode!
 
 ## Features
@@ -30,7 +25,7 @@ conversion from distance fields to images with integer precision.
 
 Update your `Cargo.toml`:
 ```toml
-signed-distance-field = "0.6.2"
+signed-distance-field = "0.6.3"
 ```
 
 Use `compute_f32_distance_field` to compute 
